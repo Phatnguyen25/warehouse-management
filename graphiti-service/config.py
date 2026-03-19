@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     NEO4J_URI: str
     NEO4J_USERNAME: str
     NEO4J_PASSWORD: str
+    NEO4J_DATABASE: str = "neo4j"  # AuraDB instance name
 
     # Google Gemini
     GOOGLE_API_KEY: str
