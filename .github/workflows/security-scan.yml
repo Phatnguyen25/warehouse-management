@@ -1,0 +1,103 @@
+name: Security — DAST & Nightly Scans
+
+on:
+  schedule:
+    - cron: '0 2 * * *'   # 2 AM UTC every day (9 AM Vietnam time)
+  workflow_dispatch:        # Manual trigger
+
+jobs:
+  # ============================================================
+  # DAST — OWASP ZAP
+  # ============================================================
+  dast:
+    name: DAST — OWASP ZAP
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start application for DAST
+        run: |
+          cp .env.example .env
+          docker compose up -d --build
+          sleep 60  # wait for services to be ready
+
+      - name: OWASP ZAP Baseline Scan
+        uses: zaproxy/action-baseline@v0.12.0
+        with:
+          target: 'http://localhost:3000'
+          rules_file_name: '.zap/rules.tsv'
+          cmd_options: '-a -j'
+        continue-on-error: true
+
+      - name: Stop application
+        if: always()
+        run: docker compose down
+
+  # ============================================================
+  # Dependency Audit — Frontend
+  # ============================================================
+  npm-audit:
+    name: npm Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: npm audit
+        working-directory: frontend
+        run: npm audit --audit-level=high
+        continue-on-error: true
+
+  # ============================================================
+  # Dependency Audit — Python
+  # ============================================================
+  pip-audit:
+    name: pip-audit (Python)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: pip-audit
+        run: |
+          pip install pip-audit
+          pip-audit -r graphiti-service/requirements.txt
+        continue-on-error: true
+
+  # ============================================================
+  # Container Image Nightly Scan
+  # ============================================================
+  nightly-image-scan:
+    name: Nightly Container Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build images
+        run: |
+          docker build -t warehouse-frontend:nightly ./frontend
+          docker build -t warehouse-graphiti:nightly ./graphiti-service
+
+      - name: Trivy scan frontend
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'warehouse-frontend:nightly'
+          severity: 'MEDIUM,HIGH,CRITICAL'
+          format: 'table'
+        continue-on-error: true
+
+      - name: Trivy scan graphiti
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'warehouse-graphiti:nightly'
+          severity: 'MEDIUM,HIGH,CRITICAL'
+          format: 'table'
+        continue-on-error: true
