@@ -10,13 +10,20 @@ FROM node:20-alpine AS deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
-COPY package.json package-lock.json ./
-RUN npm ci --only=production
+# Update npm to avoid warnings
+RUN npm install -g npm@latest
+
+COPY package.json package-lock.json* ./
+# Use npm install (more forgiving with lock file cross-platform issues)
+RUN npm install
 
 
 # Stage 2: Builder
 FROM node:20-alpine AS builder
 WORKDIR /app
+
+# Update npm
+RUN npm install -g npm@latest
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .

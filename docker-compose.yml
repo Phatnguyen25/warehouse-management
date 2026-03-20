@@ -1,5 +1,3 @@
-version: '3.9'
-
 networks:
   warehouse-net:
     driver: bridge
@@ -8,6 +6,7 @@ volumes:
   postgres_data:
   prometheus_data:
   grafana_data:
+
 
 services:
   # ============================================================
@@ -37,7 +36,7 @@ services:
     networks:
       - warehouse-net
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      test: [ "CMD", "curl", "-f", "http://localhost:3000/api/health" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -69,7 +68,7 @@ services:
     networks:
       - warehouse-net
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: [ "CMD", "curl", "-f", "http://localhost:8000/health" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -99,7 +98,7 @@ services:
     networks:
       - warehouse-net
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -113,13 +112,13 @@ services:
   # Traefik — Reverse Proxy + TLS
   # ============================================================
   traefik:
-    image: traefik:v3.1
+    image: traefik:v2.11
     container_name: warehouse-traefik
     restart: unless-stopped
     ports:
       - "80:80"
       - "443:443"
-      - "8080:8080"  # Traefik dashboard (dev only)
+      - "8080:8080" # Traefik dashboard (dev only)
     command:
       - "--api.insecure=true"
       - "--providers.docker=true"
