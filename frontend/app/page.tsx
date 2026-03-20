@@ -1,71 +1,37 @@
-import { prisma } from '@/lib/db'
+// Dashboard page - uses client-side fetching to avoid Next.js 16 RSC type conflicts
+'use client'
+import { useEffect, useState } from 'react'
 import DashboardClient from '@/components/DashboardClient'
 
-async function getDashboardData() {
-  try {
-    const [
-      totalProducts,
-      totalSuppliers,
-      totalWarehouses,
-      recentTransactions,
-      lowStockItems,
-    ] = await Promise.all([
-      prisma.product.count({ where: { isActive: true } }),
-      prisma.supplier.count({ where: { isActive: true } }),
-      prisma.warehouse.count({ where: { isActive: true } }),
-      prisma.stockTransaction.findMany({
-        take: 8,
-        orderBy: { createdAt: 'desc' },
-        include: { product: true, createdBy: true },
-      }),
-      prisma.inventory.findMany({
-        where: {
-          product: { isActive: true },
-          quantity: { lte: prisma.product.fields.minStock },
-        },
-        include: { product: true, warehouse: true },
-        take: 5,
-      }).catch(() => []),
-    ])
-
-    const inventoryValue = await prisma.inventory.aggregate({
-      _sum: { quantity: true },
-    })
-
-    return {
-      totalProducts,
-      totalSuppliers,
-      totalWarehouses,
-      totalItems: inventoryValue._sum.quantity || 0,
-      recentTransactions: recentTransactions.map(t => ({
-        id: t.id,
-        type: t.transactionType,
-        product: t.product.name,
-        quantity: t.quantity,
-        createdAt: t.createdAt.toISOString(),
-        createdBy: t.createdBy?.name || 'System',
-      })),
-      lowStockItems: lowStockItems.map(i => ({
-        id: i.id,
-        product: i.product.name,
-        quantity: i.quantity,
-        minStock: i.product.minStock,
-        warehouse: i.warehouse.name,
-      })),
-    }
-  } catch {
-    return {
-      totalProducts: 0,
-      totalSuppliers: 0,
-      totalWarehouses: 0,
-      totalItems: 0,
-      recentTransactions: [],
-      lowStockItems: [],
-    }
-  }
+const EMPTY_DATA = {
+  totalProducts: 0,
+  totalSuppliers: 0,
+  totalWarehouses: 0,
+  totalItems: 0,
+  recentTransactions: [] as Array<{ id: string; type: string; product: string; quantity: number; createdAt: string; createdBy: string }>,
+  lowStockItems: [] as Array<{ id: string; product: string; quantity: number; minStock: number; warehouse: string }>,
 }
 
-export default async function DashboardPage() {
-  const data = await getDashboardData()
+export default function DashboardPage() {
+  const [data, setData] = useState(EMPTY_DATA)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetch('/api/dashboard')
+      .then(r => r.json())
+      .then(setData)
+      .catch(() => setData(EMPTY_DATA))
+      .finally(() => setLoading(false))
+  }, [])
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh', flexDirection: 'column', gap: '1rem' }}>
+        <div style={{ fontSize: '3rem', animation: 'pulse-glow 1.5s infinite' }}>📦</div>
+        <p style={{ color: 'var(--text-secondary)' }}>Đang tải dashboard...</p>
+      </div>
+    )
+  }
+
   return <DashboardClient data={data} />
 }
